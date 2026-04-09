@@ -62,25 +62,6 @@ function TelescopePicker:browse()
                     self.config.handlers.on_delete(chats_to_delete)
                 end
 
-                -- Function to handle renaming
-                local rename_selection = function()
-                    local selection = action_state.get_selected_entry()
-                    if not selection then
-                        return
-                    end
-                    actions.close(prompt_bufnr)
-                    self.config.handlers.on_rename(selection.value)
-                end
-                -- Function to handle duplication
-                local duplicate_selection = function()
-                    local selection = action_state.get_selected_entry()
-                    if not selection then
-                        return
-                    end
-                    actions.close(prompt_bufnr)
-                    self.config.handlers.on_duplicate(selection.value)
-                end
-
                 -- Select action
                 actions.select_default:replace(function()
                     local selection = action_state.get_selected_entry()
@@ -98,30 +79,6 @@ function TelescopePicker:browse()
                     nowait = true,
                 })
                 vim.keymap.set({ "i" }, self.config.keymaps.delete.i, delete_selections, {
-                    buffer = prompt_bufnr,
-                    silent = true,
-                    nowait = true,
-                })
-
-                -- Rename items (normal mode and insert mode)
-                vim.keymap.set({ "n" }, self.config.keymaps.rename.n, rename_selection, {
-                    buffer = prompt_bufnr,
-                    silent = true,
-                    nowait = true,
-                })
-                vim.keymap.set({ "i" }, self.config.keymaps.rename.i, rename_selection, {
-                    buffer = prompt_bufnr,
-                    silent = true,
-                    nowait = true,
-                })
-
-                -- Duplicate chat (normal mode and <C-y> in insert mode)
-                vim.keymap.set({ "n" }, self.config.keymaps.duplicate.n, duplicate_selection, {
-                    buffer = prompt_bufnr,
-                    silent = true,
-                    nowait = true,
-                })
-                vim.keymap.set({ "i" }, self.config.keymaps.duplicate.i, duplicate_selection, {
                     buffer = prompt_bufnr,
                     silent = true,
                     nowait = true,

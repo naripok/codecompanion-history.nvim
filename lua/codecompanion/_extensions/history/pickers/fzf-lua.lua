@@ -47,21 +47,6 @@ function FzfluaPicker:browse()
                 end
                 vim.iter(selections):map(decode):each(self.config.handlers.on_select)
             end,
-            -- Rename item
-            [conv(self.config.keymaps.rename.i)] = function(selections)
-                if #selections == 0 then
-                    return
-                end
-                if #selections > 1 then
-                    return vim.notify(
-                        "Can rename only one " .. self:get_item_name_singular() .. " at a time",
-                        vim.log.levels.WARN
-                    )
-                end
-
-                local selection = decode(selections[1])
-                self.config.handlers.on_rename(selection)
-            end,
             -- Delete item
             [conv(self.config.keymaps.delete.i)] = function(selections)
                 if #selections == 0 then
@@ -75,18 +60,6 @@ function FzfluaPicker:browse()
                 end
 
                 self.config.handlers.on_delete(chats_to_delete)
-            end,
-            -- Duplicate chat
-            [conv(self.config.keymaps.duplicate.i)] = function(selections)
-                if #selections == 0 then
-                    return
-                end
-                if #selections > 1 then
-                    return vim.notify("Can duplicate only one chat at a time", vim.log.levels.WARN)
-                end
-
-                local selection = decode(selections[1])
-                self.config.handlers.on_duplicate(selection)
             end,
         },
         previewer = {

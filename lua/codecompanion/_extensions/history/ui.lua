@@ -4,61 +4,35 @@ local utils = require("codecompanion._extensions.history.utils")
 
 ---@class CodeCompanion.History.UI
 ---@field storage CodeCompanion.History.Storage
----@field title_generator CodeCompanion.History.TitleGenerator
+---@field opts CodeCompanion.History.Opts
 ---@field default_buf_title string
 ---@field picker CodeCompanion.History.Pickers
----@field picker_keymaps table
 local UI = {}
 
 ---@param opts CodeCompanion.History.Opts
 ---@param storage CodeCompanion.History.Storage
----@param title_generator CodeCompanion.History.TitleGenerator
 ---@return CodeCompanion.History.UI
-function UI.new(opts, storage, title_generator)
+function UI.new(opts, storage)
     local self = setmetatable({}, {
         __index = UI,
     })
 
+    self.opts = opts
     self.storage = storage
-    self.title_generator = title_generator
     self.default_buf_title = opts.default_buf_title
     self.picker = opts.picker
-    self.picker_keymaps = opts.picker_keymaps
 
     log:trace("Initialized UI with picker: %s", opts.picker)
     return self --[[@as CodeCompanion.History.UI]]
 end
 
----Update chat title with optional suffix
+---Update chat title
 ---@param chat CodeCompanion.History.Chat
----@param suffix? string Optional suffix to append to title
----@param force? boolean
-function UI:update_chat_title(chat, suffix, force)
+function UI:update_chat_title(chat)
     log:trace("Updating chat title for: %s", chat.opts.save_id or "N/A")
 
     local base_title = chat.opts.title or (self.default_buf_title .. tostring(chat.id))
-
-    if suffix then
-        local full_title = force and suffix or (base_title .. " " .. suffix)
-        self:_set_buf_title(chat.bufnr, full_title)
-    else
-        self:_set_buf_title(chat.bufnr, base_title)
-    end
-end
-
----Check and update summary indicator for existing chat
----@param chat CodeCompanion.History.Chat
-function UI:check_and_update_summary_indicator(chat)
-    if not chat.opts.save_id then
-        return
-    end
-
-    local summaries = self.storage:get_summaries()
-    if summaries[chat.opts.save_id] then
-        self:update_chat_title(chat, "(📝)")
-    else
-        self:update_chat_title(chat) -- just base title
-    end
+    self:_set_buf_title(chat.bufnr, base_title)
 end
 
 ---Method for setting buffer title with retry
@@ -165,68 +139,48 @@ function UI:_set_buf_title(bufnr, title, attempt)
     end)
 end
 
----Format items for display based on type
----@param items_data table<string,CodeCompanion.History.ChatIndexData> | table<string,CodeCompanion.History.SummaryIndexData> Raw items from storage
----@param item_type "chat" | "summary"
----@param storage CodeCompanion.History.Storage Storage instance for getting summaries
+---Format items for display
+---@param items_data table<string,CodeCompanion.History.ChatIndexData> Raw items from storage
 ---@return CodeCompanion.History.EntryItem[] Formatted items
-local function format_items(items_data, item_type, storage)
+local function format_items(items_data)
     local items = {}
 
-    if item_type == "chat" then
-        -- Get summaries to check which chats have summaries
-        local summaries = storage:get_summaries()
-
-        for _, chat_item in pairs(items_data) do
-            local save_id = chat_item.save_id
-            table.insert(
-                items,
-                vim.tbl_extend("keep", {
-                    save_id = save_id,
-                    name = chat_item.title or save_id,
-                    title = chat_item.title or save_id,
-                    updated_at = chat_item.updated_at or 0,
-                    has_summary = summaries[save_id] ~= nil, -- Add summary flag
-                }, chat_item)
-            )
-        end
-        -- Sort items by updated_at in descending order
-        table.sort(items, function(a, b)
-            return a.updated_at > b.updated_at
-        end)
-    elseif item_type == "summary" then
-        for _, summary_item in pairs(items_data) do
-            table.insert(items, summary_item)
-        end
-        -- Sort items by generated_at in descending order
-        table.sort(items, function(a, b)
-            return a.generated_at > b.generated_at
-        end)
+    for _, chat_item in pairs(items_data) do
+        local save_id = chat_item.save_id
+        table.insert(
+            items,
+            vim.tbl_extend("keep", {
+                save_id = save_id,
+                name = chat_item.title or save_id,
+                title = chat_item.title or save_id,
+                updated_at = chat_item.updated_at or 0,
+            }, chat_item)
+        )
     end
+    -- Sort items by updated_at in descending order
+    table.sort(items, function(a, b)
+        return a.updated_at > b.updated_at
+    end)
 
     return items
 end
 
----Generic method to open items (chats or summaries)
----@param item_type "chat" | "summary"
----@param items_data table<string,CodeCompanion.History.ChatIndexData> | table<string,CodeCompanion.History.SummaryIndexData> Raw items from storage
+---Generic method to open items (chats)
+---@param items_data table<string,CodeCompanion.History.ChatIndexData> Raw items from storage
 ---@param handlers CodeCompanion.History.UIHandlers Handlers for item actions
 ---@param current_item_id? string Current item ID for highlighting
-function UI:_open_items(item_type, items_data, handlers, current_item_id)
-    local item_name = item_type == "chat" and "chats" or "summaries"
-    local item_name_title = item_type == "chat" and "Saved Chats" or "Saved Summaries"
-
-    log:trace("Opening %s browser", item_name)
+function UI:_open_items(items_data, handlers, current_item_id)
+    log:trace("Opening chats browser")
 
     if vim.tbl_isempty(items_data) then
-        log:trace("No %s found", item_name)
-        vim.notify("No " .. item_name .. " found", vim.log.levels.INFO)
+        log:trace("No chats found")
+        vim.notify("No chats found", vim.log.levels.INFO)
         return
     end
 
     -- Format the items for display
-    local items = format_items(items_data, item_type, self.storage)
-    log:trace("Loaded %d %s", #items, item_name)
+    local items = format_items(items_data)
+    log:trace("Loaded %d chats", #items)
 
     -- Load the configured picker module
     log:trace("Using picker: %s", self.picker)
@@ -243,12 +197,12 @@ function UI:_open_items(item_type, items_data, handlers, current_item_id)
 
     resolved_picker
         :new({
-            item_type = item_type,
+            item_type = "chat",
             items = items,
             handlers = handlers,
-            keymaps = self.picker_keymaps,
+            keymaps = self.opts.picker_keymaps,
+            title = "Saved Chats",
             current_item_id = current_item_id,
-            title = item_name_title,
         })
         :browse()
 end
@@ -258,7 +212,7 @@ function UI:open_saved_chats(filter_fn)
     local codecompanion = require("codecompanion")
     local last_chat = codecompanion.last_chat() --[[@as CodeCompanion.History.Chat?]]
 
-    self:_open_items("chat", self.storage:get_chats(filter_fn), {
+    self:_open_items(self.storage:get_chats(filter_fn), {
         on_open = function()
             log:trace("Opening saved chats picker")
             self:open_saved_chats(filter_fn)
@@ -327,109 +281,7 @@ function UI:open_saved_chats(filter_fn)
                 vim.notify("Failed to delete chats", vim.log.levels.ERROR)
             end
         end,
-        ---@param chat_data CodeCompanion.History.ChatData
-        on_rename = function(chat_data)
-            log:trace("Renaming chat: %s", chat_data.save_id)
-
-            -- Prompt for new title with current title as default
-            vim.ui.input({
-                prompt = "Rename to: ",
-                default = chat_data.title or "",
-            }, function(new_title)
-                if not new_title or vim.trim(new_title) == "" then
-                    return -- User cancelled or entered empty title
-                end
-
-                local success = self.storage:rename_chat(chat_data.save_id, new_title)
-                if success then
-                    -- Update any open chat buffers with this save_id
-                    local found_bufnr = nil
-                    for _, bufnr in ipairs(_G.codecompanion_buffers or {}) do
-                        local chat = codecompanion.buf_get_chat(bufnr) --[[@as CodeCompanion.History.Chat?]]
-                        if chat and chat.opts.save_id == chat_data.save_id then
-                            found_bufnr = bufnr
-                            chat.opts.title = new_title
-                            self:_set_buf_title(bufnr, new_title)
-                            break
-                        end
-                    end
-                    utils.fire("TitleRenamed", {
-                        bufnr = found_bufnr,
-                        title = new_title,
-                    })
-                    vim.notify("Chat renamed successfully", vim.log.levels.INFO)
-                    self:open_saved_chats(filter_fn)
-                else
-                    vim.notify("Failed to rename chat", vim.log.levels.ERROR)
-                end
-            end)
-        end,
-        ---@param chat_data CodeCompanion.History.ChatData
-        on_duplicate = function(chat_data)
-            log:trace("Duplicating chat: %s", chat_data.save_id)
-
-            -- Prompt for new title with current title as default
-            vim.ui.input({
-                prompt = "Duplicate as: ",
-                default = chat_data.title or "",
-            }, function(new_title)
-                -- If cancelled or empty, append (1) to original title
-                if not new_title or vim.trim(new_title) == "" then
-                    local original_title = chat_data.title or "Untitled"
-                    new_title = original_title .. " (1)"
-                end
-
-                local new_save_id = self.storage:duplicate_chat(chat_data.save_id, new_title)
-                if new_save_id then
-                    vim.notify("Chat duplicated successfully", vim.log.levels.INFO)
-                    self:open_saved_chats(filter_fn)
-                else
-                    vim.notify("Failed to duplicate chat", vim.log.levels.ERROR)
-                end
-            end)
-        end,
     }, last_chat and last_chat.opts.save_id)
-end
-
----Handle summary selection from the picker
----@param summary_data CodeCompanion.History.SummaryIndexData
-function UI:_handle_summary_select(summary_data)
-    local codecompanion = require("codecompanion")
-    local active_chat = codecompanion.last_chat()
-    local current_chat = active_chat or codecompanion.chat()
-    local save_id = summary_data.summary_id
-    local chat_title = summary_data.chat_title or "Untitled"
-    if current_chat then
-        local summary_content = self.storage:load_summary(save_id)
-        if not summary_content then
-            return vim.notify("Summary not found: " .. save_id, vim.log.levels.ERROR)
-        end
-        local ref_id = "<summary>" .. chat_title .. "</summary>"
-        local content = string.format(
-            [[<summary>
-Chat Title: %s
-Summary:
-
-%s
-</summary>]],
-            chat_title,
-            summary_content
-        )
-        current_chat:add_message({
-            role = config.constants.USER_ROLE,
-            content = content,
-        }, {
-            context_id = ref_id,
-            visible = false,
-        })
-        current_chat.context:add({
-            id = ref_id,
-            source = "summary",
-        })
-        vim.notify("Summary added to chat")
-    else
-        vim.notify("No active chat to attach summary to", vim.log.levels.ERROR)
-    end
 end
 
 ---@param save_id string
@@ -463,91 +315,6 @@ function UI:_handle_on_select(save_id)
         log:error("Failed to load chat: %s", save_id)
         vim.notify("Failed to load chat", vim.log.levels.ERROR)
     end
-end
-
-function UI:open_summaries()
-    self:_open_items("summary", self.storage:get_summaries(), {
-        on_open = function()
-            log:trace("Opening summaries picker")
-            self:open_summaries()
-        end,
-        ---@param summary_data CodeCompanion.History.SummaryIndexData
-        ---@return string[] lines
-        on_preview = function(summary_data)
-            -- Load full summary content for preview
-            local summary_content = self.storage:load_summary(summary_data.summary_id)
-            if summary_content then
-                return vim.split(summary_content, "\n", { plain = true })
-            else
-                log:warn("Failed to load summary for preview: %s", summary_data.summary_id)
-                return { "Summary content not available" }
-            end
-        end,
-        ---@param summary_data CodeCompanion.History.SummaryIndexData|CodeCompanion.History.SummaryIndexData[]
-        on_delete = function(summary_data)
-            -- Handle both single summary and array of summaries
-            local summaries_to_delete = {}
-            if type(summary_data) == "table" and summary_data.summary_id then
-                -- Single summary
-                summaries_to_delete = { summary_data }
-            elseif type(summary_data) == "table" and #summary_data > 0 then
-                -- Array of summaries
-                summaries_to_delete = summary_data
-            else
-                vim.notify("Invalid summary data for deletion", vim.log.levels.ERROR)
-                return
-            end
-
-            log:trace("Deleting %d summary(s)", #summaries_to_delete)
-
-            -- Always ask for confirmation
-            local summary_count = #summaries_to_delete
-            local confirmation_message
-            if summary_count == 1 then
-                confirmation_message =
-                    string.format('Delete summary for "%s"?', summaries_to_delete[1].chat_title or "Untitled")
-            else
-                confirmation_message = string.format("Delete %d summaries?", summary_count)
-            end
-
-            local choice = vim.fn.confirm(confirmation_message, "&Yes\n&No", 2)
-            if choice ~= 1 then
-                return -- User cancelled
-            end
-
-            -- Delete all selected summaries
-            local deleted_count = 0
-            for _, summary in ipairs(summaries_to_delete) do
-                if self.storage:delete_summary(summary.summary_id) then
-                    deleted_count = deleted_count + 1
-                end
-            end
-
-            if deleted_count > 0 then
-                local message = deleted_count == 1 and "Summary deleted successfully"
-                    or string.format("%d summaries deleted successfully", deleted_count)
-                vim.notify(message, vim.log.levels.INFO)
-                self:open_summaries()
-            else
-                vim.notify("Failed to delete summaries", vim.log.levels.ERROR)
-            end
-        end,
-        ---@param summary_data CodeCompanion.History.SummaryIndexData
-        on_rename = function(summary_data)
-            -- Renaming summaries is not supported
-            vim.notify("Renaming summaries is not supported", vim.log.levels.INFO)
-        end,
-        ---@param summary_data CodeCompanion.History.SummaryIndexData
-        on_duplicate = function(summary_data)
-            -- Duplicating summaries is not supported
-            vim.notify("Duplicating summaries is not supported", vim.log.levels.INFO)
-        end,
-        ---@param summary_data CodeCompanion.History.SummaryIndexData
-        on_select = function(summary_data)
-            log:trace("Selected summary: %s", summary_data.summary_id)
-            self:_handle_summary_select(summary_data)
-        end,
-    })
 end
 
 ---Creates a new chat from the given chat data restoring what it can along with the adapter, settings. If adapter is not found, ask user to select another adapter. If adapter is found but model is not available, uses the adapter's default model.
@@ -587,9 +354,6 @@ function UI:create_chat(chat_data)
             settings = settings,
             adapter = adapter --[[@as CodeCompanion.Adapter]],
             title = title,
-            --INFO: No need to ignore system prompt here, thanks to oli we don't add system messages with same tag (`from_config`) twice.
-            -- This also fixes `gx` removing the system prompt from the chat if we pass `ignore_system_prompt = true`
-            -- ignore_system_prompt = true,
         }) --[[@as CodeCompanion.History.Chat]]
         -- Handle both old (refs) and new (context_items) storage formats
         local stored_context_items = chat_data.context_items or chat_data.refs or {}
@@ -606,7 +370,6 @@ function UI:create_chat(chat_data)
         chat.tool_registry.schemas = chat_data.schemas or {}
         chat.tool_registry.in_use = chat_data.in_use or {}
         chat.cycle = chat_data.cycle or 1
-        chat.opts.title_refresh_count = chat_data.title_refresh_count or 0
         log:trace("Successfully created chat with save_id: %s", save_id or "N/A")
         return chat
     end
@@ -626,11 +389,6 @@ function UI:create_chat(chat_data)
                 local saved_model = settings.model
                 if saved_model then
                     local available_models = resolved_adapter.schema.model.choices
-                    --INFO:Skipping if models is a function
-                    -- if type(available_models) == "function" then
-                    --     vim.notify("Please wait while we fetch the avaiable models in " .. adapter)
-                    --     available_models = available_models(resolved_adapter)
-                    -- end
                     if type(available_models) == "table" then
                         available_models = vim.iter(available_models)
                             :map(function(model, value)
@@ -651,11 +409,6 @@ function UI:create_chat(chat_data)
                                 )
                             )
                             return _create_chat(adapter, nil)
-                            --INFO: this results in rare errors where the model opts differ from one model to another model.
-                            -- return self:_change_model(available_models, function(model)
-                            --     settings.model = model
-                            --     create_chat(adapter, nil)
-                            -- end)
                         end
                     end
                 end
@@ -665,7 +418,6 @@ function UI:create_chat(chat_data)
     return _create_chat(adapter, settings)
 end
 
----[[Most of the code is copied from codecompanion/interactions/chat/ui.lua]]
 ---Retrieve the lines to be displayed in the preview window
 ---@param chat_data CodeCompanion.History.ChatData
 function UI:_get_preview_lines(chat_data)
@@ -790,15 +542,6 @@ function UI:_get_preview_lines(chat_data)
     return lines
 end
 
----@param chat CodeCompanion.History.Chat
----@param saved_at number
-function UI:update_last_saved(chat, saved_at)
-    log:trace("Updating last saved time for chat: %s", chat.opts.save_id or "N/A")
-    --saved at icon
-    local icon = " "
-    self:update_chat_title(chat, icon .. utils.format_time(saved_at))
-end
-
 local function select_opts(prompt, conditional)
     return {
         prompt = prompt,
@@ -825,7 +568,6 @@ function UI:_change_adapter(on_select)
         end)
         :totable()
     table.sort(adapters_list)
-    -- table.insert(adapters_list, 1, current_adapter)
     vim.ui.select(adapters_list, select_opts("Select Adapter"), function(selected)
         if not selected then
             return
@@ -835,19 +577,6 @@ function UI:_change_adapter(on_select)
             --set chat settings to nil, so that old adapter's settings are not used
             on_select(selected, nil)
         end
-    end)
-end
-
----@param available_models string[]
----@param on_select fun(model: string):nil
-function UI:_change_model(available_models, on_select)
-    local models = vim.deepcopy(available_models)
-    table.sort(models)
-    vim.ui.select(models, select_opts("Select Model"), function(selected)
-        if not selected then
-            return
-        end
-        on_select(selected)
     end)
 end
 

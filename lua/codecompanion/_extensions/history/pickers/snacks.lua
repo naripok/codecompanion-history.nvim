@@ -38,18 +38,6 @@ function SnacksPicker:browse()
             end
         end,
         actions = {
-            rename_item = function(picker)
-                local selections = picker:selected({ fallback = true })
-                if #selections ~= 1 then
-                    return vim.notify(
-                        "Can rename only one " .. self:get_item_name_singular() .. " at a time",
-                        vim.log.levels.WARN
-                    )
-                end
-                local selection = selections[1]
-                picker:close()
-                self.config.handlers.on_rename(selection)
-            end,
             delete_item = function(picker)
                 local selections = picker:selected({ fallback = true })
                 if #selections == 0 then
@@ -58,15 +46,6 @@ function SnacksPicker:browse()
                 picker:close()
                 self.config.handlers.on_delete(selections)
             end,
-            duplicate_chat = function(picker)
-                local selections = picker:selected({ fallback = true })
-                if #selections ~= 1 then
-                    return vim.notify("Can duplicate only one chat at a time", vim.log.levels.WARN)
-                end
-                local selection = selections[1]
-                picker:close()
-                self.config.handlers.on_duplicate(selection)
-            end,
         },
 
         win = {
@@ -74,20 +53,12 @@ function SnacksPicker:browse()
                 keys = {
                     [self.config.keymaps.delete.n] = { "delete_item", mode = "n" },
                     [self.config.keymaps.delete.i] = { "delete_item", mode = "i" },
-                    [self.config.keymaps.rename.n] = { "rename_item", mode = "n" },
-                    [self.config.keymaps.rename.i] = { "rename_item", mode = "i" },
-                    [self.config.keymaps.duplicate.n] = { "duplicate_chat", mode = "n" },
-                    [self.config.keymaps.duplicate.i] = { "duplicate_chat", mode = "i" },
                 },
             },
             list = {
                 keys = {
                     [self.config.keymaps.delete.n] = { "delete_item", mode = "n" },
                     [self.config.keymaps.delete.i] = { "delete_item", mode = "i" },
-                    [self.config.keymaps.rename.n] = { "rename_item", mode = "n" },
-                    [self.config.keymaps.rename.i] = { "rename_item", mode = "i" },
-                    [self.config.keymaps.duplicate.n] = { "duplicate_chat", mode = "n" },
-                    [self.config.keymaps.duplicate.i] = { "duplicate_chat", mode = "i" },
                 },
             },
         },

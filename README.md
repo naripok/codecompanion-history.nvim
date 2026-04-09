@@ -6,55 +6,32 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-A history management extension for [codecompanion.nvim](https://codecompanion.olimorris.dev/) that enables saving, browsing and restoring chat sessions.
-
-
-<p>
-    <video controls muted src="https://github.com/user-attachments/assets/04a6ad1f-8351-4381-ae60-00c352a1670c"></video>
-</p>
+A lightweight history management extension for [codecompanion.nvim](https://codecompanion.olimorris.dev/) that enables saving, browsing and restoring chat sessions.
 
 ## ✨ Features
 
-### 🤖 Chat Management
-- 💾 Flexible chat saving:
-  - Automatic session saving (can be disabled)
-  - Manual save with dedicated keymap
-- 🎯 Smart title generation for chats
-- 🔄 Continue from where you left
-- 📚 Browse saved chats with preview
-- 🔍 Multiple picker interfaces
-- ⌛ Optional automatic chat expiration
-- ⚡ Restore chat sessions with full context and tools state
-- 🏢 **Project-aware filtering**: Filter chats by workspace/project context
-- 📋 **Chat duplication**: Easily duplicate chats to create variations or backups
-
-### 📝 Summary System
-- **Manual summary generation**: Create summaries for any chat with `gcs`
-- **Intelligent content processing**: Extracts meaningful conversation content while filtering noise
-- **Chunked summarization**: Handles large conversations by splitting into manageable chunks
-- **Customizable generation**: Configure adapter, model, and system prompts
-- **Summary browsing**: Dedicated browser with `gbs` to explore all summaries
-
-### 🧠 Memory System (@memory tool)
-- **Vector-based search**: Uses VectorCode CLI to index and search through chat summaries
-- **Automatic indexing**: Optionally index summaries as they are generated
-- **Smart integration**: Available as `@memory` tool in new chats when VectorCode is installed
+- 💾 **Automatic chat saving**: Chats are automatically saved on each message
+- 🎯 **Smart title generation**: Titles are generated from the first user message (no API calls)
+- 📚 **Browse saved chats**: Multiple picker interfaces (telescope, snacks, fzf-lua, default)
+- ⚡ **Restore chats**: Full restoration of messages, context, tools, and settings
+- 🔍 **Project-aware filtering**: Filter chats by workspace/project context
+- 🗑️ **Delete chats**: Remove old chats from history
 
 The following CodeCompanion features are preserved when saving and restoring chats:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-|  System Prompts | ✅  | System prompt used in the chat |
-|  Messages History | ✅  | All messages |
-|  Images | ✅  | Restores images as base64 strings |
-|  LLM Adapter | ✅  | The specific adapter used for the chat |
-|  LLM Settings | ✅  | Model, temperature and other adapter settings |
-|  Tools | ✅  | Tool schemas and their system prompts |
-|  Tool Outputs | ✅  | Tool execution results |
-|  Variables | ✅  | Variables used in the chat |
-|  References | ✅  | Code snippets and command outputs added via slash commands |
-|  Pinned References | ✅  | Pinned references |
-|  Watchers | ⚠  | Saved but requires original buffer context to resume watching |
+| System Prompts | ✅ | System prompt used in the chat |
+| Messages History | ✅ | All messages |
+| Images | ✅ | Restores images as base64 strings |
+| LLM Adapter | ✅ | The specific adapter used for the chat |
+| LLM Settings | ✅ | Model, temperature and other adapter settings |
+| Tools | ✅ | Tool schemas and their system prompts |
+| Tool Outputs | ✅ | Tool execution results |
+| Variables | ✅ | Variables used in the chat |
+| References | ✅ | Code snippets and command outputs added via slash commands |
+| Pinned References | ✅ | Pinned references |
+| Watchers | ⚠ | Saved but requires original buffer context to resume watching |
 
 When restoring a chat:
 1. The complete message history is recreated
@@ -71,7 +48,6 @@ When restoring a chat:
 
 - Neovim >= 0.8.0
 - [codecompanion.nvim](https://codecompanion.olimorris.dev/)
-- [VectorCode CLI](https://github.com/Davidyz/VectorCode) (optional, for `@memory` tool)
 - [snacks.nvim](https://github.com/folke/snacks.nvim) (optional, for enhanced picker)
 - [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) (optional, for enhanced picker)
 - [fzf-lua](https://github.com/ibhagwan/fzf-lua) (optional, for enhanced picker)
@@ -106,185 +82,58 @@ require("codecompanion").setup({
                 save_chat_keymap = "sc",
                 -- Save all chats by default (disable to save only manually using 'sc')
                 auto_save = true,
-                -- Number of days after which chats are automatically deleted (0 to disable)
-                expiration_days = 0,
                 -- Picker interface (auto resolved to a valid picker)
                 picker = "telescope", --- ("telescope", "snacks", "fzf-lua", or "default") 
-                ---Optional filter function to control which chats are shown when browsing
+                -- Optional filter function to control which chats are shown when browsing
                 chat_filter = nil, -- function(chat_data) return boolean end
                 -- Customize picker keymaps (optional)
                 picker_keymaps = {
-                    rename = { n = "r", i = "<M-r>" },
                     delete = { n = "d", i = "<M-d>" },
-                    duplicate = { n = "<C-y>", i = "<C-y>" },
                 },
-                ---Automatically generate titles for new chats
-                auto_generate_title = true,
-                title_generation_opts = {
-                    ---Adapter for generating titles (defaults to current chat adapter) 
-                    adapter = nil, -- "copilot"
-                    ---Model for generating titles (defaults to current chat model)
-                    model = nil, -- "gpt-4o"
-                    ---Number of user prompts after which to refresh the title (0 to disable)
-                    refresh_every_n_prompts = 0, -- e.g., 3 to refresh after every 3rd user prompt
-                    ---Maximum number of times to refresh the title (default: 3)
-                    max_refreshes = 3,
-                    format_title = function(original_title)
-                        -- this can be a custom function that applies some custom
-                        -- formatting to the title.
-                        return original_title
-                    end
-                },
-                ---On exiting and entering neovim, loads the last chat on opening chat
-                continue_last_chat = false,
-                ---When chat is cleared with `gx` delete the chat from history
-                delete_on_clearing_chat = false,
-                ---Directory path to save the chats
+                -- Directory path to save the chats
                 dir_to_save = vim.fn.stdpath("data") .. "/codecompanion-history",
-                ---Enable detailed logging for history extension
+                -- Enable detailed logging for history extension
                 enable_logging = false,
-
-                -- Summary system
-                summary = {
-                    -- Keymap to generate summary for current chat (default: "gcs")
-                    create_summary_keymap = "gcs",
-                    -- Keymap to browse summaries (default: "gbs")
-                    browse_summaries_keymap = "gbs",
-                    
-                    generation_opts = {
-                        adapter = nil, -- defaults to current chat adapter
-                        model = nil, -- defaults to current chat model
-                        context_size = 90000, -- max tokens that the model supports
-                        include_references = true, -- include slash command content
-                        include_tool_outputs = true, -- include tool execution results
-                        system_prompt = nil, -- custom system prompt (string or function)
-                        format_summary = nil, -- custom function to format generated summary e.g to remove <think/> tags from summary
-                    },
-                },
-                
-                -- Memory system (requires VectorCode CLI)
-                memory = {
-                    -- Automatically index summaries when they are generated
-                    auto_create_memories_on_summary_generation = true,
-                    -- Path to the VectorCode executable
-                    vectorcode_exe = "vectorcode",
-                    -- Tool configuration
-                    tool_opts = { 
-                        -- Default number of memories to retrieve
-                        default_num = 10 
-                    },
-                    -- Enable notifications for indexing progress
-                    notify = true,
-                    -- Index all existing memories on startup
-                    -- (requires VectorCode 0.6.12+ for efficient incremental indexing)
-                    index_on_startup = false,
-                },
             }
         }
     }
 })
 ```
 
-
-> [!WARNING]
-> Title and summary generation defaults to current chat's adapter and model. Make sure to set cheaper models in `title_generation_opts` and `summary.generation_opts` to avoid using premium models.
-
-
 ## 🛠️ Usage
 
 #### 🎯 Commands
 
 - `:CodeCompanionHistory` - Open the history browser
-- `:CodeCompanionSummaries` - Browse all summaries
-
 
 #### ⌨️ Chat Buffer Keymaps
 
-**History Management:**
 - `gh` - Open history browser (customizable via `opts.keymap`)
 - `sc` - Save current chat manually (customizable via `opts.save_chat_keymap`)
-
-**Summary System:**
-- `gcs` - Generate summary for current chat (customizable via `opts.summary.create_summary_keymap`)
-- `gbs` - Browse saved summaries (customizable via `opts.summary.browse_summaries_keymap`)
 
 #### 📚 History Browser
 
 The history browser shows all your saved chats with:
-- Title (auto-generated or custom)
-- Summary indicator (📝 icon for chats with summaries)
-- Token estimates and relative timestamps
+- Title (from first user message, truncated to 50 characters)
+- Relative timestamps
 - Preview of chat contents
 
 Actions in history browser:
 - `<CR>` - Open selected chat
 - Normal mode:
   - `d` - Delete selected chat(s)
-  - `r` - Rename selected chat
-  - `<C-y>` - Duplicate selected chat
 - Insert mode:
   - `<M-d>` (Alt+d) - Delete selected chat(s)
-  - `<M-r>` (Alt+r) - Rename selected chat
-  - `<C-y>` - Duplicate selected chat
 
-#### 📝 Summary Browser
+## Title Generation
 
-The summary browser shows all your generated summaries with:
-- Chat title (from original conversation)
-- Project context and relative timestamps
-- Preview of summary content
+Titles are automatically generated from the first user message in the chat:
+- Extracts the first user message with content
+- Truncates to 50 characters
+- Replaces newlines with spaces
+- Falls back to "Untitled Chat" if no user message found
 
-Actions in summary browser:
-- `<CR>` - Add the summary to the current chat
-- Normal mode:
-  - `d` - Delete selected summary(s)
-- Insert mode:
-  - `<M-d>` (Alt+d) - Delete selected summary(s)
-
-
-## The `@memory` tool
-
-If you have installed the [VectorCode](https://github.com/Davidyz/VectorCode) CLI, 
-this plugin will use VectorCode to create an index for your chat summaries and create
-a tool called `@memory`. This tool gives the LLM the ability to search for
-(the summary of) previous chats so that you can refer to them in a new chat.
-
-Available options for the memory submodule:
-```lua
-opts.memory = {
-    auto_create_memories_on_summary_generation = true,
-    -- path to the `vectorcode` executable
-    vectorcode_exe = "vectorcode",
-    tool_opts = { 
-        -- default number of memories to retrieve
-        default_num = 10 
-    },
-    -- whether to enable notification
-    notify = true,
-    -- whether to automatically update the index of all existing memories on startup
-    -- (requires VectorCode 0.6.12+ for efficient incremental indexing)
-    index_on_startup = false,
-}
-```
-
-
-#### 🔄 Title Refresh Feature
-
-The extension can automatically refresh chat titles as conversations evolve:
-
-- **`refresh_every_n_prompts`**: Set to refresh the title after every N user prompts (e.g., 3 means refresh after the 3rd, 6th, 9th user message)
-- **`max_refreshes`**: Limits how many times a title can be refreshed to avoid excessive API calls
-- When refreshing, the system considers recent conversation context (both user and assistant messages) and the original title
-- Individual messages are truncated at 1000 characters with a `[truncated]` indicator
-- Total conversation context is limited to 10,000 characters with a `[conversation truncated]` indicator
-
-Example configuration for title refresh:
-```lua
-title_generation_opts = {
-    refresh_every_n_prompts = 3, -- Refresh after every 3rd user prompt
-    max_refreshes = 10,           -- Allow up to 10 refreshes per chat
-}
-```
+No API calls are made for title generation, making it instant and reliable.
 
 #### 🏢 Project-Aware Chat Filtering
 
@@ -309,14 +158,12 @@ Each chat index entry (used in filtering) includes the following information:
 -- ChatIndexData - lightweight metadata used for browsing and filtering
 {
     save_id = "1672531200",                 -- Unique chat identifier
-    title = "Debug API endpoint",           -- Chat title (auto-generated or custom)
+    title = "Debug API endpoint",           -- Chat title (from first user message)
     cwd = "/home/user/my-project",          -- Working directory when saved
     project_root = "/home/user/my-project", -- Detected project root
     adapter = "openai",                     -- LLM adapter used
     model = "gpt-4",                        -- Model name
     updated_at = 1672531200,                -- Unix timestamp of last update
-    message_count = 15,                     -- Number of messages in chat
-    token_estimate = 3420,                  -- Estimated token count
 }
 ```
 
@@ -342,23 +189,6 @@ load_chat(save_id: string): ChatData?
 
 -- Delete a chat by its save_id
 delete_chat(save_id: string): boolean
-
--- Duplicate a chat by its save_id
-duplicate_chat(save_id: string, new_title?: string): string?
-
-
--- Summary Management  
---- Generate a summary for the current chat 
-generate_summary(chat?: CodeCompanion.Chat)      
-
---- Delete a sumamry
-delete_summary(summary_id: string)      
-
---- Get summaries index
-get_summaries(): table<string, SummaryIndexData> 
-
---- Load summary 
-load_summary(summary_id: string): string?        
 ```
 
 Example usage:
@@ -372,89 +202,63 @@ end)
 
 -- Get all saved chats metadata
 local chats = history.get_chats()
+
+-- Load a specific chat
 local chat_data = history.load_chat("some_save_id")
+
+-- Delete a chat
 history.delete_chat("some_save_id")
-
--- Duplicate a chat with custom title
-local new_save_id = history.duplicate_chat("some_save_id", "My Custom Copy")
-
--- Duplicate a chat with auto-generated title (appends "(1)")
-local new_save_id = history.duplicate_chat("some_save_id")
-
--- Summary operations
-history.generate_summary() -- generates for current chat
-
-local summaries = history.get_summaries()
-
-local summary_content = history.load_summary("some_save_id")
-
-
 ```
 
-
 ## ⚙️ How It Works
-
 
 ```mermaid
 graph TD
     subgraph CodeCompanion Core Lifecycle
         A[CodeCompanionChatCreated Event] --> B{Chat Submitted};
-        B --> C[LLM Response Received];
-        subgraph Chat End
-            direction RL
-            D[CodeCompanionChatCleared Event];
-        end
-        C --> D;
-        B --> D;
+        B --> C[Auto-Save Chat];
+        C --> D[Generate Title from First Message];
+        D --> E[Update Buffer Title];
+        B --> F[CodeCompanionChatCleared Event];
     end
 
     subgraph Extension Integration
-        A -- Extension Hooks --> E[Init & Subscribe];
-        E --> F[Setup Auto-Save];
-        F --> G[Prepare Auto-Title];
-
-        C -- Extension Hooks --> H[Subscriber Triggered];
-        H --> H1{Auto-Save Enabled?};
-        H1 -- Yes --> I[Save Chat State - Messages, Tools, Refs];
-        H1 -- No --> H2[Manual Save via `sc`];
-        H2 --> I;
-        I --> J{No Title & Auto-Title Enabled?};
-        J -- Yes --> K[Generate Title];
-        K --> L[Update Buffer Title];
-        L --> M[Save Chat with New Title];
-        J -- No --> B;
-        M --> B;
-
-        D -- Extension Hooks --> N[Respond to Clear Event];
-        N --> O[Delete Chat from Storage];
-        O --> P[Reset Extension State - Title/ID];
+        A -- Extension Hooks --> G[Init & Setup];
+        G --> H[Generate save_id];
+        H --> I[Set Buffer Title];
+        
+        B -- Extension Hooks --> J[Save Chat State];
+        J --> K{Has Title?};
+        K -- No --> D;
+        K -- Yes --> B;
+        
+        F -- Extension Hooks --> L[Reset Chat State];
+        L --> M[Generate New save_id];
+        M --> I;
     end
 
     subgraph User History Interaction
-        Q[User Action - gh / :CodeCompanionHistory] --> R{History Browser};
-        R -- Restore --> S[Load Chat State from Storage];
-        S --> A;
-        R -- Delete --> O;
+        N[User Action - gh / :CodeCompanionHistory] --> O{History Browser};
+        O -- Restore --> P[Load Chat State from Storage];
+        P --> A;
+        O -- Delete --> Q[Remove from Storage];
     end
 ```
 
 Here's what's happening in simple terms:
 
-1. When you create a new chat, our extension jumps in and sets up two things:
-   - An autosave system that will save your chat
-   - A title generator that will name your chat based on the conversation
+1. When you create a new chat, our extension:
+   - Generates a unique save_id (Unix timestamp)
+   - Sets the initial buffer title
 
 2. As you chat:
-   - When auto-save is enabled (default):
-     - Each submitted message triggers automatic saving
-     - Every LLM response automatically saves the chat state
-   - Manual saving is available via the `sc` keymap
-   - If your chat doesn't have a title yet, it tries to create one that makes sense
+   - Each submitted message triggers automatic saving
+   - If the chat doesn't have a title, it generates one from the first user message
    - All your messages, tools, and references are safely stored
 
 3. When you clear a chat:
-   - Our extension knows to remove it from storage (if configured)
-   - This keeps your history clean and organized
+   - The chat state is reset
+   - A new save_id is generated for the fresh chat
 
 4. Any time you want to look at old chats:
    - Use `gh` or the command to open the history browser
@@ -462,31 +266,31 @@ Here's what's happening in simple terms:
    - Or remove ones you don't need anymore
 
 <details>
-    <summary> Technical details </summary>
+    <summary>Technical details</summary>
 
 The extension integrates with CodeCompanion through a robust event-driven architecture:
 
 1. **Initialization and Storage Management**:
    - Uses a dedicated Storage class to manage chat persistence in `{data_path}/codecompanion-history/`
    - Maintains an index.json for metadata and individual JSON files for each chat
-   - Implements file I/O operations with error handling and atomic writes
+   - Implements file I/O operations with error handling
 
 2. **Chat Lifecycle Integration**:
    - Hooks into `CodeCompanionChatCreated` event to:
      - Generate unique save_id (Unix timestamp)
-     - Initialize chat subscribers for auto-saving
      - Set initial buffer title with sparkle icon (✨)
 
    - Monitors `CodeCompanionChatSubmitted` events to:
      - Persist complete chat state including messages, tools, schemas, and references
-     - Trigger title generation if enabled and title is empty
-     - Update buffer title with relative timestamps
+     - Generate title from first user message if no title exists
+     - Update buffer title
 
-3. **Title Generation System**:
-   - Uses the chat's configured LLM adapter for title generation
-   - Implements smart content truncation (1000 chars) and prompt engineering
-   - Handles title collisions with automatic numbering
-   - Updates titles asynchronously using vim.schedule
+3. **Title Generation**:
+   - Extracts first user message with content
+   - Truncates to 50 characters
+   - Replaces newlines with spaces
+   - Falls back to "Untitled Chat" if no user message found
+   - No API calls required - instant generation
 
 4. **State Management**:
    - Preserves complete chat context including:
@@ -512,22 +316,19 @@ The extension integrates with CodeCompanion through a robust event-driven archit
 
 ## 🔮 Future Roadmap
 
-
 ### Upcoming Features
-- [ ] Auto-summary generation options
-- [ ] Summary search and filtering
-- [ ] Integration with vector databases
+- [ ] Chat search functionality
+- [ ] Chat tagging and categorization
+- [ ] Export chats to markdown
 
 ## 🔌 Related Extensions
 
 - [MCP Hub](https://codecompanion.olimorris.dev/extensions/mcphub.html) extension
-- [VectorCode](https://codecompanion.olimorris.dev/extensions/vectorcode.html) extension
 
 ## 🙏 Acknowledgements
 
 Special thanks to:
 - [Oli Morris](https://github.com/olimorris) for creating the amazing [CodeCompanion.nvim](https://codecompanion.olimorris.dev) plugin - a highly configurable and powerful coding assistant for Neovim.
-- [David](https://github.com/Davidyz) for the awesome [VectorCode](https://github.com/Davidyz/VectorCode) CLI and adding the @memory tool integration. 
 
 ## 📄 License
 
