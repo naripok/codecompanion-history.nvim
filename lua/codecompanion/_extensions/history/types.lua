@@ -71,3 +71,8 @@
 ---@class CodeCompanion.History.EditorInfo
 ---@field last_active CodeCompanion.History.BufferInfo|nil
 ---@field buffers CodeCompanion.History.BufferInfo[]
+
+---@class CodeCompanion.History.TitleGeneratedEvent
+---@field bufnr number Buffer number
+---@field title string Generated title
+---@field id number Chat ID

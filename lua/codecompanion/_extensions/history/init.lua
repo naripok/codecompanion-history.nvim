@@ -178,6 +178,45 @@ function History:_setup_autocommands()
             self.ui:update_chat_title(chat)
         end),
     })
+
+    vim.api.nvim_create_autocmd("User", {
+        pattern = "CodeCompanionChatTitleGenerated",
+        group = group,
+        callback = vim.schedule_wrap(function(opts)
+            log:trace("Chat title generated event received for bufnr: %s", opts.data.bufnr)
+
+            local chat_module = require("codecompanion.interactions.chat")
+            local chat = chat_module.buf_get_chat(opts.data.bufnr) --[[@as CodeCompanion.History.Chat]]
+
+            if not chat then
+                return log:trace("No chat found for bufnr: %s", opts.data.bufnr)
+            end
+
+            local new_title = opts.data.title
+            if not new_title or new_title == "" then
+                return log:trace("Empty title received, skipping")
+            end
+
+            -- Check if title actually changed
+            if chat.opts.title == new_title then
+                return log:trace("Title unchanged, skipping save")
+            end
+
+            log:trace("Updating chat title from '%s' to '%s'", chat.opts.title or "nil", new_title)
+
+            -- Update chat title
+            chat.opts.title = new_title
+
+            -- Update buffer title
+            self.ui:update_chat_title(chat)
+
+            -- Re-save chat with new title
+            if self.opts.auto_save then
+                self.storage:save_chat(chat)
+                log:debug("Chat re-saved with new title: %s", new_title)
+            end
+        end),
+    })
 end
 
 function History:_setup_keymaps()

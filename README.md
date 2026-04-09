@@ -11,7 +11,7 @@ A lightweight history management extension for [codecompanion.nvim](https://code
 ## ✨ Features
 
 - 💾 **Automatic chat saving**: Chats are automatically saved on each message
-- 🎯 **Smart title generation**: Titles are generated from the first user message (no API calls)
+- 🎯 **Smart title generation**: Choose between simple titles (from first message) or LLM-generated titles (optional)
 - 📚 **Browse saved chats**: Multiple picker interfaces (telescope, snacks, fzf-lua, default)
 - ⚡ **Restore chats**: Full restoration of messages, context, tools, and settings
 - 🔍 **Project-aware filtering**: Filter chats by workspace/project context
@@ -127,6 +127,10 @@ Actions in history browser:
 
 ## Title Generation
 
+The extension supports two title generation modes:
+
+### Simple Title Generation (Default)
+
 Titles are automatically generated from the first user message in the chat:
 - Extracts the first user message with content
 - Truncates to 50 characters
@@ -134,6 +138,61 @@ Titles are automatically generated from the first user message in the chat:
 - Falls back to "Untitled Chat" if no user message found
 
 No API calls are made for title generation, making it instant and reliable.
+
+### LLM-Based Title Generation (Optional)
+
+For better, more descriptive titles, you can enable LLM-based title generation. This uses CodeCompanion's background task system to generate pithy, context-aware titles via your configured LLM.
+
+**Benefits:**
+- More accurate and descriptive titles
+- Captures the essence of the conversation
+- Handles multi-turn conversations better
+
+**Requirements:**
+- An LLM adapter configured for background tasks
+- Enable the feature in your CodeCompanion config (see below)
+
+**Enable LLM-Based Title Generation:**
+
+Add this to your CodeCompanion configuration:
+
+```lua
+require("codecompanion").setup({
+    interactions = {
+        background = {
+            chat = {
+                callbacks = {
+                    ["on_ready"] = {
+                        actions = {
+                            "codecompanion._extensions.history.codecompanion.interactions.background.chat_make_title",
+                        },
+                        enabled = true,
+                    },
+                },
+                opts = {
+                    enabled = true,
+                },
+            },
+        },
+    },
+    extensions = {
+        history = {
+            enabled = true,
+            opts = {
+                -- your history options
+            }
+        }
+    }
+})
+```
+
+**How it works:**
+1. When a new chat is created, the background title generation is triggered asynchronously
+2. The LLM analyzes the conversation and generates a concise title (8 words or fewer)
+3. The generated title is automatically saved and displayed
+4. If LLM title generation fails, the extension falls back to simple title generation
+
+**Note:** This is optional. Without enabling it, the history extension will use simple title generation from the first user message.
 
 #### 🏢 Project-Aware Chat Filtering
 
@@ -217,31 +276,39 @@ graph TD
     subgraph CodeCompanion Core Lifecycle
         A[CodeCompanionChatCreated Event] --> B{Chat Submitted};
         B --> C[Auto-Save Chat];
-        C --> D[Generate Title from First Message];
-        D --> E[Update Buffer Title];
-        B --> F[CodeCompanionChatCleared Event];
+        C --> D{Has Title?};
+        D -- No --> E[Generate Simple Title];
+        E --> F[Update Buffer Title];
+        B --> G[CodeCompanionChatCleared Event];
+    end
+
+    subgraph LLM Title Generation Optional
+        H[Background Task Triggered] --> I{LLM Generates Title};
+        I -- Success --> J[CodeCompanionChatTitleGenerated Event];
+        J --> K[Update Chat Title];
+        K --> L[Re-Save Chat];
+        L --> F;
+        I -- Fail/Disabled --> E;
     end
 
     subgraph Extension Integration
-        A -- Extension Hooks --> G[Init & Setup];
-        G --> H[Generate save_id];
-        H --> I[Set Buffer Title];
+        A -- Extension Hooks --> M[Init & Setup];
+        M --> N[Generate save_id];
+        N --> O[Set Buffer Title];
         
-        B -- Extension Hooks --> J[Save Chat State];
-        J --> K{Has Title?};
-        K -- No --> D;
-        K -- Yes --> B;
+        B -- Extension Hooks --> P[Save Chat State];
+        P --> D;
         
-        F -- Extension Hooks --> L[Reset Chat State];
-        L --> M[Generate New save_id];
-        M --> I;
+        G -- Extension Hooks --> Q[Reset Chat State];
+        Q --> R[Generate New save_id];
+        R --> O;
     end
 
     subgraph User History Interaction
-        N[User Action - gh / :CodeCompanionHistory] --> O{History Browser};
-        O -- Restore --> P[Load Chat State from Storage];
-        P --> A;
-        O -- Delete --> Q[Remove from Storage];
+        S[User Action - gh / :CodeCompanionHistory] --> T{History Browser};
+        T -- Restore --> U[Load Chat State from Storage];
+        U --> A;
+        T -- Delete --> V[Remove from Storage];
     end
 ```
 
@@ -253,7 +320,9 @@ Here's what's happening in simple terms:
 
 2. As you chat:
    - Each submitted message triggers automatic saving
-   - If the chat doesn't have a title, it generates one from the first user message
+   - If the chat doesn't have a title, it generates a simple one from the first user message
+   - If LLM-based title generation is enabled, a background task will generate a better title
+   - The generated title automatically updates and re-saves the chat
    - All your messages, tools, and references are safely stored
 
 3. When you clear a chat:
@@ -282,15 +351,19 @@ The extension integrates with CodeCompanion through a robust event-driven archit
 
    - Monitors `CodeCompanionChatSubmitted` events to:
      - Persist complete chat state including messages, tools, schemas, and references
-     - Generate title from first user message if no title exists
+     - Generate simple title from first user message if no title exists
      - Update buffer title
 
+   - Listens for `CodeCompanionChatTitleGenerated` events (LLM-based titles):
+     - Updates chat title with LLM-generated title
+     - Re-saves chat with new title
+     - Falls back to simple title generation if LLM generation fails
+
 3. **Title Generation**:
-   - Extracts first user message with content
-   - Truncates to 50 characters
-   - Replaces newlines with spaces
-   - Falls back to "Untitled Chat" if no user message found
-   - No API calls required - instant generation
+   - **Simple Mode **(default) Extracts first user message with content, truncates to 50 characters, replaces newlines with spaces
+   - **LLM Mode **(optional) Uses background task system to generate context-aware titles via configured LLM
+   - No API calls required for simple mode - instant generation
+   - LLM mode provides more accurate, descriptive titles for multi-turn conversations
 
 4. **State Management**:
    - Preserves complete chat context including:
